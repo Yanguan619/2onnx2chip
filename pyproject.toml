@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tonnx2chip"
+version = "0.1.0"
+description = "Qwen3.5 ONNX → ATC → OM pipeline for Ascend NPU"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "typer",
+    "onnx==1.14.0",
+    "onnxruntime==1.16.0",
+    "numpy==1.26.4",
+    "Pillow",
+    "tqdm",
+    "transformers==5.4.0",
+    "accelerate",
+    "modelscope",
+    "onnxsim",
+]
+
+[project.scripts]
+tonnx2chip = "tonnx2chip.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+tonnx2chip = ["*.sh", "config/*"]

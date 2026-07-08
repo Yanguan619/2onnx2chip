@@ -116,9 +116,10 @@ def torch_chunk_gated_delta_rule(
     initial_dtype = query.dtype
     query = l2norm(query, dim=-1, eps=1e-6)
     key = l2norm(key, dim=-1, eps=1e-6)
-    query, key, value, beta, g = [
-        x.transpose(1, 2).contiguous().to(torch.float32) for x in (query, key, value, beta, g)
-    ]
+    # Only g needs fp32 for exp() stability; Q/K/V/beta stay in initial_dtype (fp16)
+    # to halve peak memory during ONNX export.
+    query, key, value, beta = [x.transpose(1, 2).contiguous() for x in (query, key, value, beta)]
+    g = g.transpose(1, 2).contiguous().to(torch.float32)
 
     batch_size, num_heads, sequence_length, k_head_dim = key.shape
     v_head_dim = value.shape[-1]
@@ -203,9 +204,9 @@ def torch_recurrent_gated_delta_rule(
     initial_dtype = query.dtype
     query = l2norm(query, dim=-1, eps=1e-6)
     key = l2norm(key, dim=-1, eps=1e-6)
-    query, key, value, beta, g = [
-        x.transpose(1, 2).contiguous().to(torch.float32) for x in (query, key, value, beta, g)
-    ]
+    # Only g needs fp32 for exp() stability; Q/K/V/beta stay in initial_dtype (fp16)
+    query, key, value, beta = [x.transpose(1, 2).contiguous() for x in (query, key, value, beta)]
+    g = g.transpose(1, 2).contiguous().to(torch.float32)
 
     batch_size, num_heads, sequence_length, k_head_dim = key.shape
     v_head_dim = value.shape[-1]
@@ -367,13 +368,17 @@ _mu._preprocess_mask_arguments = _patched_preprocess
 
 
 # ==================== Wrapper Classes ====================
-class VisionEncoderWrapper(torch.nn.Module):
+class VisionEncoderWrapper(nn.Module):
     def __init__(self, visual) -> None:
         super().__init__()
         self.visual = visual
 
     def forward(self, pixel_values: torch.Tensor, image_grid_thw: torch.Tensor):
         return Qwen3_5VisionModelOpt.forward(self.visual, pixel_values, image_grid_thw)
+
+    @property
+    def device(self):
+        return self.visual.device
 
 
 class Qwen35PrefillWrapper(nn.Module):
@@ -408,6 +413,10 @@ class Qwen35PrefillWrapper(nn.Module):
             else:
                 result.extend([pkv.conv_states[i], pkv.recurrent_states[i]])
         return tuple(result)
+
+    @property
+    def device(self):
+        return self.causal_lm.device
 
 
 class Qwen35DecoderWrapper(nn.Module):
@@ -471,6 +480,10 @@ class Qwen35DecoderWrapper(nn.Module):
                 present.extend([out_pkv.conv_states[i], out_pkv.recurrent_states[i]])
         return tuple(present)
 
+    @property
+    def device(self):
+        return self.causal_lm.device
+
 
 # 1. 导出 Embedding 层
 class EmbeddingWrapper(torch.nn.Module):
@@ -513,6 +526,8 @@ def onnx_export_all_tensors_to_one_file(
     input_names: Sequence[str] | None = None,
     output_names: Sequence[str] | None = None,
 ):
+    device = model.device
+    args_device = tuple(arg.to(device) if isinstance(arg, torch.Tensor) else arg for arg in args)
     tmp_path = onnx_path
     all_tensors_to_one_file_flag = False
 
@@ -527,7 +542,7 @@ def onnx_export_all_tensors_to_one_file(
         with torch.no_grad():
             torch.onnx.export(
                 model,
-                args,
+                args_device,
                 tmp_path,
                 input_names=input_names,
                 output_names=output_names,
@@ -873,7 +888,7 @@ def main(
     export_dir = Path(export_path)
     export_dir.mkdir(parents=True, exist_ok=True)
 
-    model, causal_lm, torch_input = _load_model_and_inputs(qwen_path, img_path, text)
+    model, causal_lm, torch_input = _load_model_and_inputs(qwen_path, img_path, text, device="npu")
 
     print(f"Exporting to {export_dir} ...")
     export_vit(model, torch_input, export_dir)

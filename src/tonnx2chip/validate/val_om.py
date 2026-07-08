@@ -30,7 +30,6 @@ from tonnx2chip.constants import (
     TARGET_SEQ_LEN,
     VOCAB_SIZE,
 )
-from tonnx2chip.tools.memory_monitor import MemoryMonitor
 
 
 def load_om(device_id: int, path: str, weight_dir: str | None = None):

@@ -27,11 +27,7 @@ from pathlib import Path
 
 import numpy as np
 import onnx
-import typer
 from onnx import helper, numpy_helper
-
-app = typer.Typer()
-
 
 INT64_MAX = np.iinfo(np.int64).max
 
@@ -221,10 +217,9 @@ def replace_pad_with_slice(model_path, output_path):
     return converted
 
 
-@app.command()
 def main(
-    input_path: str = typer.Option(..., help="Input ONNX model"),
-    output_path: str = typer.Option(None, help="Output ONNX path"),
+    input_path: str,
+    output_path: str | None = None,
 ):  # If output is not specified, use input with .replaced suffix
     n = replace_pad_with_slice(input_path, output_path)
     if n == 0:
@@ -233,4 +228,4 @@ def main(
 
 
 if __name__ == "__main__":
-    app()
+    pass

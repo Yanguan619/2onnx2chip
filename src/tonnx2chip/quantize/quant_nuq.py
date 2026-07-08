@@ -28,7 +28,6 @@ import subprocess
 from pathlib import Path
 
 import amct_onnx as amct
-import typer
 
 from tonnx2chip.quantize.quant_uniform import (
     EXPECTED_KL_DIVERGENCE,
@@ -40,8 +39,6 @@ from tonnx2chip.quantize.quant_uniform import (
 
 _HERE = Path(__file__).resolve().parent
 _NUQ_CFG_TEMPLATE = _HERE.parent / "config" / "nuq_base.cfg"
-
-app = typer.Typer(pretty_exceptions_enable=False)
 
 
 # ── ATC 生成融合 JSON ─────────────────────────────────────────────
@@ -90,7 +87,6 @@ IMAGE_PATH = Path(__file__).parent.parent.parent.parent / "assets" / "224x224.pn
 
 
 # ── CLI: 非均匀量化 ────────────────────────────────────────────────
-@app.command()
 def nuq(
     model_path: str = typer.Option(..., help="原始 ONNX 模型"),
     deploy_model: str = typer.Option(
@@ -158,4 +154,4 @@ def nuq(
 
 
 if __name__ == "__main__":
-    app()
+    pass

@@ -19,8 +19,9 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch_npu
-import typer
 from ais_bench.infer.interface import InferSession
+from transformers import AutoConfig, AutoProcessor, Qwen3_5ForConditionalGeneration
+
 from tonnx2chip.constants import (
     EMBED_SEQ_LEN,
     FULL_ATTN_LAYERS,
@@ -30,16 +31,11 @@ from tonnx2chip.constants import (
     VOCAB_SIZE,
 )
 from tonnx2chip.tools.memory_monitor import MemoryMonitor
-from transformers import AutoConfig, AutoProcessor, Qwen3_5ForConditionalGeneration
-
-app = typer.Typer(pretty_exceptions_enable=False)
 
 
 def load_om(device_id: int, path: str, weight_dir: str | None = None):
     name = Path(path).name
-    tag = f"{name}" + (
-        f" (shared weights from {Path(weight_dir).name})" if weight_dir else ""
-    )
+    tag = f"{name}" + (f" (shared weights from {Path(weight_dir).name})" if weight_dir else "")
     print(f"  Loading {tag}...", flush=True)
     sess = InferSession(device_id, path, weight_dir=weight_dir)
     return sess
@@ -103,12 +99,8 @@ class Qwen35OM:
         self.emb = load_om(device_id, embed_path)
         prefill_weight_dir = str(Path(decoder_prefill_path).parent / "weight")
         decode_weight_dir = str(Path(decoder_decode_path).parent / "weight")
-        self.prefill = load_om(
-            device_id, decoder_prefill_path, weight_dir=prefill_weight_dir
-        )
-        self.decode = load_om(
-            device_id, decoder_decode_path, weight_dir=decode_weight_dir
-        )
+        self.prefill = load_om(device_id, decoder_prefill_path, weight_dir=prefill_weight_dir)
+        self.decode = load_om(device_id, decoder_decode_path, weight_dir=decode_weight_dir)
 
         # Cache declared output shapes (positional InferSession I/O)
         self.prefill_out_shapes = [tuple(o.shape) for o in self.prefill.get_outputs()]
@@ -167,9 +159,7 @@ class Qwen35OM:
                     merged_w = w // self.spatial_merge_size
                     h_pos = np.repeat(np.arange(merged_h, dtype=np.int64), merged_w)
                     w_pos = np.tile(np.arange(merged_w, dtype=np.int64), merged_h)
-                    pos_3d[0, 0, start:end] = (
-                        np.arange(length, dtype=np.int64) + cur_pos
-                    )
+                    pos_3d[0, 0, start:end] = np.arange(length, dtype=np.int64) + cur_pos
                     pos_3d[1, 0, start:end] = h_pos
                     pos_3d[2, 0, start:end] = w_pos
                     cur_pos += length
@@ -211,9 +201,7 @@ class Qwen35OM:
         messages = [
             {
                 "role": "user",
-                "content": (
-                    [{"type": "image", "image": image_path}] if image_path else []
-                )
+                "content": ([{"type": "image", "image": image_path}] if image_path else [])
                 + [{"type": "text", "text": prompt}],
             }
         ]
@@ -265,9 +253,7 @@ class Qwen35OM:
         del logits_tensor
         next_tok = int(logits[0, seq_len - 1].argmax())
         del logits
-        print(
-            f"  first token: {next_tok} ({self.processor.tokenizer.decode([next_tok])!r})"
-        )
+        print(f"  first token: {next_tok} ({self.processor.tokenizer.decode([next_tok])!r})")
 
         # KV cache stays on device; state list holds [type, device_tensor_k, device_tensor_v]
         states = self.extract_states(prefill_outs_raw)
@@ -330,9 +316,7 @@ class Qwen35OM:
                         flush=True,
                     )
 
-            decode_outs_raw = self.decode.run_from_tensors(
-                decode_inputs_dev, out_array=False
-            )
+            decode_outs_raw = self.decode.run_from_tensors(decode_inputs_dev, out_array=False)
 
             logits_dev = decode_outs_raw[0]
             logits_dev.to_host()
@@ -362,41 +346,22 @@ IMAGE_PATH = Path(__file__).parent.parent.parent.parent / "assets" / "224x224.pn
 PROMPT = "Describe this image."
 
 
-@app.command()
-def infer(
-    vit_path: str = typer.Option(
-        ...,
-        help="VIT OM path (use 'none' to disable for text-only)",
-    ),
-    embedding_path: str = typer.Option(
-        ...,
-        help="Embedding OM path",
-    ),
-    decoder_prefill_path: str = typer.Option(
-        ...,
-        help="Decoder prefill OM path (pad2slice version recommended)",
-    ),
-    decoder_decode_path: str = typer.Option(
-        ...,
-        help="Decoder decode OM path",
-    ),
-    qwen_path: str = typer.Option(..., help="Original Qwen model dir"),
-    prompt: str = typer.Option(PROMPT, help="Prompt"),
-    image_path: str = typer.Option(IMAGE_PATH, help="Image path (or 'none')"),
-    max_new_tokens: int = typer.Option(2, help="Max new tokens"),
-    device_id: int = typer.Option(0, help="NPU device ID"),
-    baseline: bool = typer.Option(
-        True, help="Also run PyTorch baseline for comparison"
-    ),
+def main(
+    vit_path: str,
+    embedding_path: str,
+    decoder_prefill_path: str,
+    decoder_decode_path: str,
+    qwen_path: str,
+    prompt: str = PROMPT,
+    image_path: str = str(IMAGE_PATH),
+    max_new_tokens: int = 2,
+    device_id: int = 0,
+    baseline: bool = True,
 ):
     for f in [embedding_path, decoder_prefill_path, decoder_decode_path]:
         assert Path(f).exists(), f"Missing {f}"
 
-    vit = (
-        None
-        if (vit_path.lower() == "none" or not Path(vit_path).exists())
-        else vit_path
-    )
+    vit = None if (vit_path.lower() == "none" or not Path(vit_path).exists()) else vit_path
     img = None if image_path.lower() == "none" else image_path
 
     runner = Qwen35OM(
@@ -464,4 +429,4 @@ def infer(
 
 
 if __name__ == "__main__":
-    app()
+    pass

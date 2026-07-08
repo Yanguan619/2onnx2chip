@@ -14,9 +14,6 @@ from typing import Any
 
 import auto_optimizer  # noqa: F401  # pyright: ignore[reportMissingImports]
 import onnx
-import typer
-
-app = typer.Typer()
 
 
 def ensure_parent(path: Path) -> None:
@@ -51,8 +48,7 @@ def tensor_uses_external_data(tensor: Any) -> bool:
     if getattr(tensor, "data_location", None) != onnx.TensorProto.EXTERNAL:
         return False
     return any(
-        entry.key == "location" and entry.value
-        for entry in getattr(tensor, "external_data", [])
+        entry.key == "location" and entry.value for entry in getattr(tensor, "external_data", [])
     )
 
 
@@ -67,15 +63,12 @@ def graph_uses_external_data(graph: Any) -> bool:
             return True
     for node in graph.node:
         for attribute in node.attribute:
-            if (
-                attribute.type == onnx.AttributeProto.TENSOR
-                and tensor_uses_external_data(attribute.t)
+            if attribute.type == onnx.AttributeProto.TENSOR and tensor_uses_external_data(
+                attribute.t
             ):
                 return True
             if attribute.type == onnx.AttributeProto.TENSORS:
-                if any(
-                    tensor_uses_external_data(tensor) for tensor in attribute.tensors
-                ):
+                if any(tensor_uses_external_data(tensor) for tensor in attribute.tensors):
                     return True
             if attribute.type == onnx.AttributeProto.GRAPH and graph_uses_external_data(
                 attribute.g
@@ -206,17 +199,11 @@ def infer_shapes_inplace(model_path: Path) -> dict[str, Any]:
                         data_prop=True,
                     )
                     if not inferred_path.exists():
-                        raise RuntimeError(
-                            "Path-based shape inference did not produce a model"
-                        )
-                    inferred_external = inferred_path.with_name(
-                        inferred_path.name + ".data"
-                    )
+                        raise RuntimeError("Path-based shape inference did not produce a model")
+                    inferred_external = inferred_path.with_name(inferred_path.name + ".data")
                     target_external = external_data_path(model_path)
                     inferred_graph_model = load_onnx_graph_model(inferred_path)
-                    inferred_uses_external_data = model_uses_external_data(
-                        inferred_graph_model
-                    )
+                    inferred_uses_external_data = model_uses_external_data(inferred_graph_model)
                     inferred_path.replace(model_path)
                     if inferred_external.exists():
                         remove_path_if_exists(target_external)
@@ -228,9 +215,7 @@ def infer_shapes_inplace(model_path: Path) -> dict[str, Any]:
         except Exception as exc:  # noqa: BLE001
             last_exc = exc
     else:
-        raise RuntimeError(
-            "Shape inference failed in both memory and path modes"
-        ) from last_exc
+        raise RuntimeError("Shape inference failed in both memory and path modes") from last_exc
 
     inferred = load_onnx_graph_model(model_path)
     return {
@@ -378,9 +363,7 @@ def inspect_candidate(
         onnx.checker.check_model(str(model_path))
         result["onnx_checker"] = True
         result["input_names"] = [
-            value.name
-            for value in model.graph.input
-            if value.name not in initializer_names
+            value.name for value in model.graph.input if value.name not in initializer_names
         ]
         result["output_names"] = [value.name for value in model.graph.output]
     except Exception as exc:  # noqa: BLE001
@@ -416,9 +399,7 @@ def parse_shape_profile(raw_profile: str) -> dict[str, list[int]]:
         if not item:
             continue
         if ":" not in item:
-            raise ValueError(
-                f"Invalid profile item {item!r}; expected name:dim0,dim1,..."
-            )
+            raise ValueError(f"Invalid profile item {item!r}; expected name:dim0,dim1,...")
         name, raw_shape = item.split(":", 1)
         name = name.strip()
         if not name:
@@ -476,9 +457,7 @@ def inspect_io_contract(model_path: Path) -> dict[str, Any]:
 def input_value_infos(model) -> list[Any]:
     initializer_names = {init.name for init in model.graph.initializer}
     return [
-        value_info
-        for value_info in model.graph.input
-        if value_info.name not in initializer_names
+        value_info for value_info in model.graph.input if value_info.name not in initializer_names
     ]
 
 
@@ -490,9 +469,7 @@ def validate_profile_names(
     for index, profile in enumerate(profiles):
         unknown = sorted(set(profile) - input_names)
         if unknown:
-            raise ValueError(
-                f"Profile {index} contains unknown graph inputs: {unknown}"
-            )
+            raise ValueError(f"Profile {index} contains unknown graph inputs: {unknown}")
 
 
 def shape_from_profile_or_graph(
@@ -620,9 +597,7 @@ def profile_coverage_for_dynamic_inputs(
         profile_shapes = [profile[name] for profile in profiles]
         ranks = {len(profile_shape) for profile_shape in profile_shapes}
         if len(ranks) != 1:
-            raise ValueError(
-                f"Profiles for {name} have varying ranks: {profile_shapes}"
-            )
+            raise ValueError(f"Profiles for {name} have varying ranks: {profile_shapes}")
         rank = ranks.pop()
         if rank != len(shape):
             raise ValueError(
@@ -792,10 +767,7 @@ def produced_tensor_names(model) -> set[str]:
         value.name for value in model.graph.input if value.name not in initializer_names
     }
     node_output_names = {
-        output_name
-        for node in model.graph.node
-        for output_name in node.output
-        if output_name
+        output_name for node in model.graph.node for output_name in node.output if output_name
     }
     return initializer_names | graph_input_names | node_output_names
 
@@ -803,9 +775,7 @@ def produced_tensor_names(model) -> set[str]:
 def find_orphan_graph_outputs(model_path: Path) -> list[str]:
     model = load_onnx_graph_model(model_path)
     available_names = produced_tensor_names(model)
-    return [
-        value.name for value in model.graph.output if value.name not in available_names
-    ]
+    return [value.name for value in model.graph.output if value.name not in available_names]
 
 
 def identity_alias_map(model_path: Path) -> dict[str, str]:
@@ -940,9 +910,7 @@ def run_onnxslim(input_path: Path, output_path: Path) -> dict[str, Any]:
         "shape_inference": safe_infer_shapes_inplace(output_path),
         "structural_validation": structural_validation,
     }
-    result["orphan_output_repair"] = repair_orphan_graph_outputs(
-        output_path, input_path
-    )
+    result["orphan_output_repair"] = repair_orphan_graph_outputs(output_path, input_path)
     if result["orphan_output_repair"].get("attempted"):
         result["shape_inference_after_repair"] = safe_infer_shapes_inplace(output_path)
     result["remaining_orphan_outputs"] = find_orphan_graph_outputs(output_path)
@@ -994,11 +962,7 @@ def is_auto_optimizer_no_knowledge_message(messages: str) -> bool:
 
 def load_type_maps(model) -> tuple[dict[str, int], dict[str, Any]]:
     value_types: dict[str, int] = {}
-    for value in (
-        list(model.graph.value_info)
-        + list(model.graph.input)
-        + list(model.graph.output)
-    ):
+    for value in list(model.graph.value_info) + list(model.graph.input) + list(model.graph.output):
         elem_type = value.type.tensor_type.elem_type
         if elem_type:
             value_types[value.name] = elem_type
@@ -1057,9 +1021,7 @@ def find_or_create_int32_initializer(
         clone_name = f"{base_name}_{suffix}"
         suffix += 1
 
-    clone_tensor = numpy_helper.from_array(
-        source_array.astype(target_np_dtype), name=clone_name
-    )
+    clone_tensor = numpy_helper.from_array(source_array.astype(target_np_dtype), name=clone_name)
     model.graph.initializer.append(clone_tensor)
     initializers[clone_name] = clone_tensor
     return clone_name, True
@@ -1094,9 +1056,7 @@ def find_or_create_int64_initializer(
         clone_name = f"{base_name}_{suffix}"
         suffix += 1
 
-    clone_tensor = numpy_helper.from_array(
-        source_array.astype(target_np_dtype), name=clone_name
-    )
+    clone_tensor = numpy_helper.from_array(source_array.astype(target_np_dtype), name=clone_name)
     model.graph.initializer.append(clone_tensor)
     initializers[clone_name] = clone_tensor
     return clone_name, True
@@ -1132,8 +1092,7 @@ def choose_target_integer_type(
     dynamic_input_types = {
         elem_type
         for name, elem_type in zip(input_names, input_types)
-        if elem_type in {TensorProto.INT32, TensorProto.INT64}
-        and name not in initializers
+        if elem_type in {TensorProto.INT32, TensorProto.INT64} and name not in initializers
     }
     if len(dynamic_input_types) == 1:
         return next(iter(dynamic_input_types))
@@ -1143,8 +1102,7 @@ def choose_target_integer_type(
     output_types = {
         value_types[name]
         for name in node.output
-        if name in value_types
-        and value_types[name] in {TensorProto.INT32, TensorProto.INT64}
+        if name in value_types and value_types[name] in {TensorProto.INT32, TensorProto.INT64}
     }
     if len(output_types) == 1:
         return next(iter(output_types))
@@ -1176,12 +1134,8 @@ def patch_mixed_int_concat_nodes(model) -> list[dict[str, Any]]:
         if node.op_type != "Concat":
             continue
 
-        input_types = [
-            input_elem_type(name, value_types, initializers) for name in node.input
-        ]
-        concrete_types = {
-            elem_type for elem_type in input_types if elem_type is not None
-        }
+        input_types = [input_elem_type(name, value_types, initializers) for name in node.input]
+        concrete_types = {elem_type for elem_type in input_types if elem_type is not None}
         if concrete_types != {TensorProto.INT32, TensorProto.INT64}:
             continue
         target_dtype = choose_target_integer_type(
@@ -1241,12 +1195,8 @@ def patch_mixed_int_slice_nodes(model) -> list[dict[str, Any]]:
             (index, name) for index, name in enumerate(node.input[1:], start=1) if name
         ]
         index_inputs = [name for _, name in indexed_index_inputs]
-        index_types = [
-            input_elem_type(name, value_types, initializers) for name in index_inputs
-        ]
-        concrete_types = {
-            elem_type for elem_type in index_types if elem_type is not None
-        }
+        index_types = [input_elem_type(name, value_types, initializers) for name in index_inputs]
+        concrete_types = {elem_type for elem_type in index_types if elem_type is not None}
         if concrete_types != {TensorProto.INT32, TensorProto.INT64}:
             continue
         target_dtype = choose_target_integer_type(
@@ -1320,8 +1270,7 @@ def repair_shape_index_int_mismatch(
         include_onnxruntime=True,
     )
     record["success"] = bool(
-        record["inspection"].get("onnx_checker")
-        and record["inspection"].get("onnxruntime_load")
+        record["inspection"].get("onnx_checker") and record["inspection"].get("onnxruntime_load")
     )
     if not record["success"]:
         record["reason"] = "repair_output_failed_runtime_validation"
@@ -1343,12 +1292,8 @@ def run_auto_optimizer(
         }
 
     external_data_path = output_path.with_name(output_path.name + ".data")
-    repaired_output = output_path.with_name(
-        f"{output_path.stem}.repaired{output_path.suffix}"
-    )
-    repaired_external_data_path = external_data_path.with_name(
-        f"{repaired_output.name}.data"
-    )
+    repaired_output = output_path.with_name(f"{output_path.stem}.repaired{output_path.suffix}")
+    repaired_external_data_path = external_data_path.with_name(f"{repaired_output.name}.data")
     if output_path.exists():
         output_path.unlink()
     if external_data_path.exists():
@@ -1386,21 +1331,13 @@ def run_auto_optimizer(
         payload["known_noop"] = True
         payload["optimization_effect"] = "no_op"
         payload["reason"] = "auto_optimizer_no_knowledge_matched"
-    command_succeeded = (
-        result.returncode == 0 and output_path.exists() and not no_knowledge_matched
-    )
+    command_succeeded = result.returncode == 0 and output_path.exists() and not no_knowledge_matched
     if command_succeeded:
         payload["shape_inference"] = safe_infer_shapes_inplace(output_path)
-        payload["structural_validation"] = inspect_candidate(
-            output_path, include_onnxruntime=False
-        )
-        payload["orphan_output_repair"] = repair_orphan_graph_outputs(
-            output_path, input_path
-        )
+        payload["structural_validation"] = inspect_candidate(output_path, include_onnxruntime=False)
+        payload["orphan_output_repair"] = repair_orphan_graph_outputs(output_path, input_path)
         if payload["orphan_output_repair"].get("attempted"):
-            payload["shape_inference_after_repair"] = safe_infer_shapes_inplace(
-                output_path
-            )
+            payload["shape_inference_after_repair"] = safe_infer_shapes_inplace(output_path)
         payload["remaining_orphan_outputs"] = find_orphan_graph_outputs(output_path)
         payload["runtime_validation_before_repair"] = inspect_candidate(
             output_path,
@@ -1415,17 +1352,13 @@ def run_auto_optimizer(
             repaired_output = output_path.with_name(
                 f"{output_path.stem}.repaired{output_path.suffix}"
             )
-            payload["shape_index_int_mismatch_repair"] = (
-                repair_shape_index_int_mismatch(
-                    output_path,
-                    repaired_output,
-                )
+            payload["shape_index_int_mismatch_repair"] = repair_shape_index_int_mismatch(
+                output_path,
+                repaired_output,
             )
             if payload["shape_index_int_mismatch_repair"].get("success"):
                 final_path = repaired_output
-                final_validation = payload["shape_index_int_mismatch_repair"][
-                    "inspection"
-                ]
+                final_validation = payload["shape_index_int_mismatch_repair"]["inspection"]
 
         payload["path"] = str(final_path.resolve())
         payload["final_validation"] = final_validation
@@ -1446,21 +1379,12 @@ def run_auto_optimizer(
     return payload
 
 
-@app.command()
 def main(
-    model: str = typer.Option(..., help="Path to the source ONNX model"),
-    save_dir: str = typer.Option("", help="Directory for optimized ONNX artifacts"),
-    probe_shape_profile: list[str] = typer.Option(
-        [],
-        help="Concrete input profile used to probe graph output shapes before optimization",
-    ),
-    skip_output_shape_probe: bool = typer.Option(
-        False, help="Skip the pre-optimization ORT probe and graph output shape patch"
-    ),
-    autoopt_knowledges: str = typer.Option(
-        "",
-        help="Comma-separated knowledge names for auto_optimizer (default: all active knowledges)",
-    ),
+    model: str,
+    save_dir: str,
+    probe_shape_profile: list[str] = [],
+    skip_output_shape_probe=False,
+    autoopt_knowledges="",
 ) -> None:
     model_path = Path(model).resolve()
     model_name = model_path.stem
@@ -1554,9 +1478,7 @@ def main(
     else:
         knowledges = autoopt_knowledges or None
         if knowledges:
-            print(
-                f"Running auto_optimizer (knowledges={knowledges}), log: {autoopt_log}"
-            )
+            print(f"Running auto_optimizer (knowledges={knowledges}), log: {autoopt_log}")
         else:
             print(f"Running auto_optimizer, log: {autoopt_log}")
         autoopt_record = run_auto_optimizer(
@@ -1591,4 +1513,4 @@ def main(
 
 
 if __name__ == "__main__":
-    app()
+    pass

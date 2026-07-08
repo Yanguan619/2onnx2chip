@@ -29,11 +29,8 @@ import amct_onnx as amct
 import numpy as np
 import onnxruntime as ort
 import torch
-import typer
 from amct_onnx.common.auto_calibration import AutoCalibrationEvaluatorBase
 from transformers import AutoConfig, AutoProcessor, Qwen3_5ForConditionalGeneration
-
-app = typer.Typer(pretty_exceptions_enable=False)
 
 TARGET_SEQ_LEN = 256
 EXPECTED_KL_DIVERGENCE = 0.01  # KL threshold; tune empirically
@@ -108,6 +105,7 @@ class CalibInputBuilder:
 
     def build_prefill_inputs(self, img_path: str = "") -> tuple[dict, int, int]:
         print("  [DataBuilder] 构建 prefill 校准输入...")
+
         def _build_token_inputs(img_path: str = "", prompt: str = "Describe this image.") -> dict:
             content = []
             if img_path and Path(img_path).exists():
@@ -195,7 +193,9 @@ class CalibInputBuilder:
             )
             golden_token = int(out.logits[0, orig_seq_len - 1].argmax())
 
-        print(f"  [DataBuilder] prefill 输入构建完成 (seq_len={orig_seq_len}, golden_token={golden_token})")
+        print(
+            f"  [DataBuilder] prefill 输入构建完成 (seq_len={orig_seq_len}, golden_token={golden_token})"
+        )
         return (
             {
                 "multimodal_attention_mask": self._to_numpy(attention_mask, np.int64),
@@ -511,7 +511,7 @@ class QwenEvaluator(AutoCalibrationEvaluatorBase):
         return ok, loss
 
 
-def quantize_one(
+def main(
     model_path: str,
     qwen_path: str,
     save_dir: str,
@@ -560,88 +560,5 @@ def quantize_one(
         print(f"  {onnx_file}")
 
 
-@app.command()
-def quantize(
-    model_path: str = typer.Option(..., help="Path to the ONNX model"),
-    qwen_path: str = typer.Option(..., help="Original Qwen3.5 model directory"),
-    save_dir: str = typer.Option("./output/amct_results", help="Output directory"),
-    img_path: str = typer.Option(None, help="Calibration image path"),
-    device: str = typer.Option("npu", help="Torch device"),
-    expected_acc_loss: float = typer.Option(EXPECTED_KL_DIVERGENCE, help="KL threshold"),
-    activation_offset: bool = typer.Option(True, help="Enable activation offset"),
-    decode_steps: int = typer.Option(256, help="Decode calibration steps"),
-):
-    """Quantize a single decoder_prefill or decoder_decode ONNX model."""
-    quantize_one(
-        model_path=model_path,
-        qwen_path=qwen_path,
-        save_dir=save_dir,
-        img_path=img_path or _default_img_path(),
-        device=device,
-        expected_acc_loss=expected_acc_loss,
-        activation_offset=activation_offset,
-        decode_steps=decode_steps,
-    )
-
-
-@app.command()
-def quantize_all(
-    onnx_dir: str = typer.Option(..., help="Directory containing ONNX submodels"),
-    qwen_path: str = typer.Option(..., help="Original Qwen3.5 model path"),
-    save_dir_str: str = typer.Option(
-        "./output/amct_results", "--save-dir", help="Root save directory"
-    ),
-    img_path: str = typer.Option(None, help="Calibration image path"),
-    device: str = typer.Option("npu", help="Torch device"),
-    expected_acc_loss: float = typer.Option(EXPECTED_KL_DIVERGENCE, help="KL threshold"),
-    activation_offset: bool = typer.Option(True, help="Enable activation offset"),
-    decode_steps: int = typer.Option(256, help="Decode calibration steps"),
-):
-    """Quantize all decoder_prefill and decoder_decode ONNX models."""
-    save_dir = Path(save_dir_str)
-    save_dir.mkdir(parents=True, exist_ok=True)
-    resolved_img_path = img_path or _default_img_path()
-
-    submodels = {
-        "decoder_prefill": Path(onnx_dir)
-        / "decoder_model_prefill"
-        / "decoder_model_prefill_final.onnx",
-        "decoder_decode": Path(onnx_dir)
-        / "decoder_model_decode"
-        / "decoder_model_decode_final.onnx",
-    }
-
-    results = {}
-    for name, mp in submodels.items():
-        if not mp.exists():
-            print(f"Skipping {name}: {mp} not found")
-            continue
-
-        sub_save = save_dir / name
-        sub_save.mkdir(parents=True, exist_ok=True)
-        clean_temp_dirs(save_dir)
-
-        try:
-            quantize_one(
-                model_path=str(mp),
-                qwen_path=qwen_path,
-                save_dir=str(sub_save),
-                img_path=resolved_img_path,
-                device=device,
-                expected_acc_loss=expected_acc_loss,
-                activation_offset=activation_offset,
-                decode_steps=decode_steps,
-            )
-            results[name] = "success"
-        except Exception as e:
-            results[name] = f"failed: {e}"
-            print(f"[Error] {name} failed: {e}")
-        finally:
-            clean_temp_dirs(save_dir)
-
-    for name, status in results.items():
-        print(f"  {name}: {status}")
-
-
 if __name__ == "__main__":
-    app()
+    pass

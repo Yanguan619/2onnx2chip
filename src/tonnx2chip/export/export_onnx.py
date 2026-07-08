@@ -14,7 +14,6 @@ import torch.nn.functional as F
 # as 0-D tensors, which then crashes in sdpa_mask BC check (line 492).
 # Fix: ensure q_length/kv_length/q_offset/kv_offset are Python ints.
 import transformers.masking_utils as _mu
-import typer
 from tqdm import tqdm
 from transformers import AutoProcessor, Qwen3_5ForConditionalGeneration
 from transformers.models.qwen3_5 import (
@@ -29,7 +28,6 @@ from transformers.models.qwen3_5.modeling_qwen3_5 import (
     apply_mask_to_padding_states as _apply_mask,
 )
 
-app = typer.Typer()
 # ==================== Patch
 _orig_preprocess = _mu._preprocess_mask_arguments
 warnings.filterwarnings("ignore", category=torch.jit.TracerWarning)
@@ -484,13 +482,13 @@ class EmbeddingWrapper(torch.nn.Module):
         return self.embed_tokens(input_ids)
 
 
-def get_model_input(qwen_path, imgs_paths, batch_size, device):
+def get_model_input(qwen_path, imgs_paths, text, batch_size, device):
     processor = AutoProcessor.from_pretrained(qwen_path)
     messages = [
         {
             "role": "user",
             "content": [{"type": "image", "image": img_path} for img_path in imgs_paths]
-            + [{"type": "text", "text": "Describe this image."}],
+            + [{"type": "text", "text": text}],
         }
     ]
 
@@ -832,7 +830,7 @@ def export_decode(
 IMAGE_PATH = Path(__file__).parent.parent.parent.parent / "assets" / "224x224.png"
 
 
-def _load_model_and_inputs(qwen_path: str, img_path: str, device: str = "cpu"):
+def _load_model_and_inputs(qwen_path: str, img_path: str, text: str, device: str = "cpu"):
     """Load model and prepare inputs. Returns (model, causal_lm, torch_input)."""
     full_model = Qwen3_5ForConditionalGeneration.from_pretrained(
         qwen_path,
@@ -861,59 +859,27 @@ def _load_model_and_inputs(qwen_path: str, img_path: str, device: str = "cpu"):
             )
 
     causal_lm.eval()
-    torch_input = get_model_input(qwen_path, [img_path], 1, device)
+    torch_input = get_model_input(qwen_path, [img_path], text, 1, device)
     return model, causal_lm, torch_input
 
 
-def _worker_vit(qwen_path: str, export_dir: Path, img_path: str):
-    model, _, torch_input = _load_model_and_inputs(qwen_path, img_path)
-    export_vit(model, torch_input, export_dir)
-
-
-def _worker_prefill(qwen_path: str, export_dir: Path, img_path: str):
-    model, causal_lm, torch_input = _load_model_and_inputs(qwen_path, img_path)
-    export_prefill(model, causal_lm, torch_input, export_dir)
-
-
-def _worker_decode(qwen_path: str, export_dir: Path, img_path: str):
-    model, causal_lm, torch_input = _load_model_and_inputs(qwen_path, img_path)
-    export_decode(model, causal_lm, torch_input, export_dir)
-
-
-@app.command()
 def main(
-    qwen_path: str = typer.Option(..., help="Qwen3.5-2B model path"),
-    export_path: str = typer.Option(..., help="Export path"),
-    img_path: str = typer.Option(str(IMAGE_PATH), help="Input path"),
-    parallel: bool = typer.Option(False, help="Export in parallel"),
+    qwen_path: str,
+    export_path: str,
+    img_path: str,
+    text: str,
+    context_length: int = 256,
 ):
     export_dir = Path(export_path)
     export_dir.mkdir(parents=True, exist_ok=True)
 
-    if parallel:
-        import multiprocessing as mp
+    model, causal_lm, torch_input = _load_model_and_inputs(qwen_path, img_path, text)
 
-        workers = [
-            mp.Process(target=_worker_vit, args=(qwen_path, export_dir, img_path)),
-            mp.Process(target=_worker_decode, args=(qwen_path, export_dir, img_path)),
-        ]
-        for w in workers:
-            w.start()
-        for w in workers:
-            w.join()
-        failed = any(w.exitcode != 0 for w in workers)
-        if failed:
-            print("⚠️ 部分子进程异常退出，请检查日志")
-        _worker_prefill(qwen_path, export_dir, img_path)
-        print("✅ 所有模型导出完成")
-        return
-
-    model, causal_lm, torch_input = _load_model_and_inputs(qwen_path, img_path)
-
+    print(f"Exporting to {export_dir} ...")
     export_vit(model, torch_input, export_dir)
-    precomputed = export_prefill(model, causal_lm, torch_input, export_dir)
-    export_decode(model, causal_lm, torch_input, export_dir, precomputed=precomputed)
+    precomputed = export_prefill(model, causal_lm, torch_input, export_dir, context_length)
+    export_decode(model, causal_lm, torch_input, export_dir, context_length, precomputed)
 
 
 if __name__ == "__main__":
-    app()
+    pass

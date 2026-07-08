@@ -5,11 +5,9 @@ from pathlib import Path
 import numpy as np
 import onnxruntime as ort
 import torch
-import typer
 from tqdm import tqdm
 from transformers import AutoConfig, AutoProcessor, Qwen3_5ForConditionalGeneration
 
-app = typer.Typer(pretty_exceptions_enable=False)
 ONNX_Provider = ["CPUExecutionProvider"]
 
 
@@ -284,16 +282,15 @@ IMAGE_PATH = Path(__file__).parent.parent.parent.parent / "assets" / "224x224.pn
 PROMPT = "Describe this image."
 
 
-@app.command()
 def main(
-    vit_path: str = typer.Option(..., help="Dir with ONNX files"),
-    embed_path: str = typer.Option(..., help="Dir with ONNX files"),
-    decoder_prefill_path: str = typer.Option(..., help="Dir with ONNX files"),
-    decoder_decode_path: str = typer.Option(..., help="Dir with ONNX files"),
-    qwen_path: str = typer.Option(..., help="Original Qwen model dir"),
-    prompt: str = typer.Option(PROMPT, help="Prompt"),
-    image_path: str = typer.Option(IMAGE_PATH, help="Image path"),
-    max_new_tokens: int = typer.Option(20, help="Max new tokens"),
+    vit_path: str,
+    embed_path: str,
+    decoder_prefill_path: str,
+    decoder_decode_path: str,
+    qwen_path: str,
+    prompt: str = PROMPT,
+    image_path: str = str(IMAGE_PATH),
+    max_new_tokens: int = 20,
 ):
     runner = Qwen35ONNX(vit_path, embed_path, decoder_prefill_path, decoder_decode_path, qwen_path)
     start = time.time()
@@ -353,4 +350,4 @@ def main(
 
 
 if __name__ == "__main__":
-    app()
+    pass

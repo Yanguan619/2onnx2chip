@@ -29,8 +29,12 @@ import amct_onnx as amct
 import numpy as np
 import onnxruntime as ort
 import torch
+import torch_npu
+
 from amct_onnx.common.auto_calibration import AutoCalibrationEvaluatorBase
 from transformers import AutoConfig, AutoProcessor, Qwen3_5ForConditionalGeneration
+
+torch_npu.npu.set_compile_mode(jit_compile=False)
 
 TARGET_SEQ_LEN = 256
 EXPECTED_KL_DIVERGENCE = 0.01  # KL threshold; tune empirically

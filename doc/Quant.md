@@ -3,27 +3,27 @@
 ## Step 1: Install dependencies
 
 ```bash
-[ -f Ascend-cann-amct_8.5.0_linux-aarch64.tar.gz ] || wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%208.5.0/Ascend-cann-amct_8.5.0_linux-aarch64.tar.gz
+[ -f Ascend-cann-amct_9.0.0_linux-aarch64.tar.gz ] || wget https://ascend-repo.obs.cn-east-2.myhuaweicloud.com/CANN/CANN%209.0.0/Ascend-cann-amct_9.0.0_linux-aarch64.tar.gz
 mkdir -p amct_source
 tar -zxvf Ascend-cann-amct*linux*.tar.gz -C amct_source
 (
     cd amct_source/amct_onnx/
     pip uninstall -y amct_onnx
     # https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/850/devaids/amct/atlasamct_16_0030.html
-    pip install numpy==1.26.4 onnxruntime==1.16.0 onnx==1.14.0 protobuf==3.20.3 opencv-python-headless amct_onnx-*-py3-none-linux_*.whl --user
+    pip install numpy==1.26.4 onnxruntime==1.16.0 onnx==1.14.0 protobuf==3.20.3 opencv-python-headless setuptools amct_onnx-*-py3-none-linux_*.whl
 
     # 重建 amct_onnx_op
     # https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/850/devaids/amct/atlasamct_16_0034.html
     rm -rf amct_onnx_op
     tar -zxvf amct_onnx_op.tar.gz
-    for f in onnxruntime_cxx_api.h onnxruntime_cxx_inline.h onnxruntime_c_api.h onnxruntime_session_options_config_keys.h onnxruntime_float16.h;
-    do
-        unzip -j v1.16.0.zip "onnxruntime-1.16.0/include/onnxruntime/core/session/$f" -d amct_onnx_op/inc/;
-    done
-    ls -l amct_onnx_op/inc/
+    # for f in onnxruntime_cxx_api.h onnxruntime_cxx_inline.h onnxruntime_c_api.h onnxruntime_session_options_config_keys.h onnxruntime_float16.h;
+    # do
+    #     unzip -j v1.16.0.zip "onnxruntime-1.16.0/include/onnxruntime/core/session/$f" -d amct_onnx_op/inc/;
+    # done
+    # ls -l amct_onnx_op/inc/
     cd amct_onnx_op/
-    python3 setup.py build
-    echo "======== Test ========" && python3 -c "import amct_onnx as amct; print(f'{amct.AMCT_SO=}')"
+    python setup.py build
+    echo "======== Test ========" && python -c "import amct_onnx as amct; print(f'{amct.AMCT_SO=}')"
 )
 ```
 

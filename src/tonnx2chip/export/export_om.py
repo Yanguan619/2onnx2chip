@@ -13,7 +13,6 @@ Defaults:
     SOC_VERSION: Ascend910_9362
 """
 
-import argparse
 import os
 import subprocess
 import sys
@@ -45,10 +44,7 @@ def probe_shapes(model_path: str) -> str:
 
 def run_atc(cmd: str, description: str):
     """Execute an ATC command and print timing."""
-    print(f"\n{'═' * 60}")
-    print(f"[{description}]")
-    print(f"Command: {cmd}")
-    print(f"{'═' * 60}")
+    print(f"[INFO] {cmd}")
 
     start = time.time()
     result = subprocess.run(cmd, shell=True, capture_output=False)
@@ -111,45 +107,54 @@ def main(
     embed_path = onnx_dir / "embedding/embedding_final.onnx"
     prefill_path = onnx_dir / "decoder_model_prefill/decoder_model_prefill_final_pad2slice.onnx"
     decode_path = onnx_dir / "decoder_model_decode/decoder_model_decode_final.onnx"
-    assert Path(vit_path).exists(), f"Vision Encoder ONNX not found: {vit_path}"
-    assert Path(embed_path).exists(), f"Embedding ONNX not found: {embed_path}"
-    assert Path(prefill_path).exists(), f"Decoder Prefill ONNX not found: {prefill_path}"
-    assert Path(decode_path).exists(), f"Decoder Decode ONNX not found: {decode_path}"
+
     # --- Vision Encoder ---
-    keep_dtype_path = Path(__file__).parent.parent / "config" / "keep_dtype.list"
-    vit_out_path = f"{om_dir}/vision_encoder"
-    run_atc(
-        atc(str(vit_path), vit_out_path, soc_version, f"--keep_dtype={keep_dtype_path}"),
-        "Vision Encoder",
+    if not Path(vit_path).exists():
+        print(f"Vision Encoder ONNX not found: {vit_path}, skip.")
+    else:
+        keep_dtype_path = Path(__file__).parent.parent / "config" / "keep_dtype.list"
+        vit_out_path = f"{om_dir}/vision_encoder"
+        run_atc(
+            atc(str(vit_path), vit_out_path, soc_version, f"--keep_dtype={keep_dtype_path}"),
+            "Vision Encoder",
     )
 
     # --- Embedding ---
-    embed_out_path = f"{om_dir}/embedding"
-    run_atc(atc(str(embed_path), embed_out_path, soc_version), "Embedding")
+    if not Path(embed_path).exists():
+        print(f"Embedding ONNX not found: {embed_path}, skip.")
+    else:
+        embed_out_path = f"{om_dir}/embedding"
+        run_atc(atc(str(embed_path), embed_out_path, soc_version), "Embedding")
 
     # --- Prefill Decoder ---
-    prefill_out_path = f"{om_dir}/decoder_model_prefill"
-    run_atc(
-        atc(
-            str(prefill_path),
-            prefill_out_path,
-            soc_version,
-            "--precision_mode=allow_fp32_to_fp16 --external_weight=1",
-        ),
-        "Decoder Prefill",
-    )
+    if not Path(prefill_path).exists():
+        print(f"Decoder Prefill ONNX not found: {prefill_path}, skip.")
+    else:
+        prefill_out_path = f"{om_dir}/decoder_model_prefill"
+        run_atc(
+            atc(
+                str(prefill_path),
+                prefill_out_path,
+                soc_version,
+                "--precision_mode=allow_fp32_to_fp16 --external_weight=1",
+            ),
+            "Decoder Prefill",
+        )
 
     # --- Decode Decoder ---
-    decode_out_path = f"{om_dir}/decoder_model_decode"
-    run_atc(
-        atc(
-            str(decode_path),
-            decode_out_path,
-            soc_version,
-            "--precision_mode=allow_fp32_to_fp16 --external_weight=1",
-        ),
-        "Decoder Decode",
-    )
+    if not Path(decode_path).exists():
+        print(f"Decoder Decode ONNX not found: {decode_path}, skip.")
+    else:
+        decode_out_path = f"{om_dir}/decoder_model_decode"
+        run_atc(
+            atc(
+                str(decode_path),
+                decode_out_path,
+                soc_version,
+                "--precision_mode=allow_fp32_to_fp16 --external_weight=1",
+            ),
+            "Decoder Decode",
+        )
 
     print(f"\n{'═' * 30}")
     print("✅ All conversions completed successfully!")

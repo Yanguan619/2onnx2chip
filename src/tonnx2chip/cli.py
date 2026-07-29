@@ -115,6 +115,7 @@ def quantize_onnx(
     decode_steps: int = typer.Option(256, help="Decode calibration steps"),
 ):
     """Step2.2(Optional): Quantize a single decoder_prefill or decoder_decode ONNX model."""
+    assert Path(model_path).suffix == ".onnx", "Model path must be an ONNX file"
 
     from tonnx2chip.quantize.quant_uniform import main as quantize_one
 

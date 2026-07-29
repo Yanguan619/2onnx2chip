@@ -16,9 +16,9 @@
 
 set -euo pipefail
 
-ONNX_DIR="${1:-output/onnx-output-opt/}"
+ONNX_DIR="${1:-/data/Qwen3.5-2B-Edge/onnx-output-opt/onnx-output-opt}"
 OM_DIR="${2:-output/om/}"
-SOC_VERSION="${3:-Ascend910_9362}"
+SOC_VERSION="${3:-Ascend310P3}"
 
 mkdir -p "$OM_DIR"
 echo "════════════════════════"
@@ -58,7 +58,7 @@ CMD_VIT="atc --model $VIT_PATH \
     --framework 5 \
     --soc_version $SOC_VERSION \
     --input_shape='$(probe_shapes "$VIT_PATH")' \
-    --keep_dtype=config/keep_dtype.cfg \
+    --keep_dtype=config/keep_dtype.list \
     --device 0"
 
 EMBED_PATH=$ONNX_DIR/embedding/embedding_final.onnx
@@ -77,7 +77,7 @@ CMD_PREFILL="ASCEND_SLOG_PRINT_TO_STDOUT=0 atc --model $PREFILL_PATH \
     --framework 5 \
     --soc_version $SOC_VERSION \
     --input_shape='$(probe_shapes "$PREFILL_PATH")' \
-    --precision_mode=force_fp32 --external_weight=1 \
+    --precision_mode=allow_fp32_to_fp16 --external_weight=1 \
     --device 0"
 
 # output 多一层级是因为保存了外置权重且外置权重路径必定在weight目录下，避免与decoder_prefill重复
@@ -88,7 +88,7 @@ CMD_DECODE="ASCEND_SLOG_PRINT_TO_STDOUT=0 atc --model $DECODE_PATH \
     --framework 5 \
     --soc_version $SOC_VERSION \
     --input_shape='$(probe_shapes "$DECODE_PATH")' \
-    --precision_mode=force_fp32 --external_weight=1 \
+    --precision_mode=allow_fp32_to_fp16 --external_weight=1 \
     --device 0"
 
 # ---- Execution ----

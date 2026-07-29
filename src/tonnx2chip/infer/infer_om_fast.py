@@ -452,9 +452,9 @@ if __name__ == "__main__":
     #     qwen_path="/data2/Qwen3.5-2B",
     # )
     infer(
-        vit_path="/data/workspace/weight/Qwen3.5-2B-Edge/om-310p/vision_encoder.om",
-        embedding_path="/data/workspace/weight/Qwen3.5-2B-Edge/om-310p/embedding.om",
-        decoder_prefill_path="/data/workspace/weight/Qwen3.5-2B-Edge/om-310p/decoder_model_prefill/decoder_model_prefill.om",
-        decoder_decode_path="/data/workspace/weight/Qwen3.5-2B-Edge/om-310p/decoder_model_decode/decoder_model_decode.om",
-        qwen_path="/data/workspace/weight/Qwen3.5-2B",
+        vit_path="output/om/vision_encoder.om",
+        embedding_path="output/om/embedding.om",
+        decoder_prefill_path="output/om/decoder_model_prefill/decoder_model_prefill.om",
+        decoder_decode_path="output/om/decoder_model_decode/decoder_model_decode.om",
+        qwen_path="/data/Qwen3.5-2B",
     )

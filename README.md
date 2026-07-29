@@ -7,6 +7,8 @@ Qwen3.5 ONNX → ATC → OM 端到端流水线，用于在华为昇腾 NPU 上�
 ### 1. 安装 Python 包
 
 ```bash
+apt-get install -y protobuf-compiler libprotobuf-dev
+
 pip install git+<repo-url>
 ```
 

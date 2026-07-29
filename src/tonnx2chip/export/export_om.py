@@ -116,8 +116,8 @@ def main(
     assert Path(prefill_path).exists(), f"Decoder Prefill ONNX not found: {prefill_path}"
     assert Path(decode_path).exists(), f"Decoder Decode ONNX not found: {decode_path}"
     # --- Vision Encoder ---
-    vit_out_path = f"{om_dir}/vision_encoder"
     keep_dtype_path = Path(__file__).parent.parent / "config" / "keep_dtype.list"
+    vit_out_path = f"{om_dir}/vision_encoder"
     run_atc(
         atc(str(vit_path), vit_out_path, soc_version, f"--keep_dtype={keep_dtype_path}"),
         "Vision Encoder",
@@ -134,7 +134,7 @@ def main(
             str(prefill_path),
             prefill_out_path,
             soc_version,
-            "--precision_mode=force_fp32 --external_weight=1",
+            "--precision_mode=allow_fp32_to_fp16 --external_weight=1",
         ),
         "Decoder Prefill",
     )
@@ -146,7 +146,7 @@ def main(
             str(decode_path),
             decode_out_path,
             soc_version,
-            "--precision_mode=force_fp32 --external_weight=1",
+            "--precision_mode=allow_fp32_to_fp16 --external_weight=1",
         ),
         "Decoder Decode",
     )
